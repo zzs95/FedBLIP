@@ -69,7 +69,7 @@ The `prompts/` folder is organized into three parts:
    - **language and style guidelines**, and
    - for impression generation, additional **phrase patterns**, **priority rules**, and **recommendation styles**.
 
-3. **Inference backends**
+3. **LLM-Inference backends**
    `prompts/rewrite_process_ollama.py` and `prompts/rewrite_process_llama3.py` define how prompts are sent to the underlying language model.
    In the current workflow, the prompt text is formed by inserting the institution-specific template into the generic wrapper, and then passed to the selected LLM backend for generation.
 
