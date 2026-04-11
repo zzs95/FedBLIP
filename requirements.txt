@@ -1,0 +1,25 @@
+# Core runtime dependencies for Fed-BLIP (stage1 + stage2 + server + test)
+numpy
+pandas
+scipy
+openpyxl
+scikit-learn
+tqdm
+requests
+pillow
+pyyaml
+
+# Federated server
+fastapi
+uvicorn
+pydantic
+python-multipart
+
+# Training / distributed utilities
+monai
+timm
+iopath
+omegaconf
+transformers
+
+tensorboard

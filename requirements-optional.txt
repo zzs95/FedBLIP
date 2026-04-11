@@ -1,0 +1,13 @@
+# Optional: LLM-based findings/impression rewriting
+ollama
+httpx
+
+# Optional: medical IO / preprocessing helpers used by Utils/sitk_utils.py
+simpleitk
+nibabel
+pynrrd
+pydicom
+ants
+
+# Optional: extra metric script dependency
+torchio

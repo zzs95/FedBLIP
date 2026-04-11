@@ -1,0 +1,20 @@
+name: fedblip
+channels:
+  - pytorch
+  - nvidia
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+
+  # Install PyTorch with CUDA 12.4 from conda
+  - pytorch=2.5.*
+  - torchvision=0.20.*
+  - torchaudio=2.5.*
+  - pytorch-cuda=12.4
+
+  - pip:
+      - -r requirements.txt
+      # Uncomment if you need optional utilities:
+      # - -r requirements-optional.txt
