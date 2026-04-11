@@ -147,25 +147,7 @@ def main():
     seed_everything(24)
     print("🚀 Starting 3-Center Federated Pretraind Model Testing")
     model = ImageClassifier(out_channels=[len(v) for v in abnormality_dict.values()], extract_feat=True).to(DEVICE)
-    
-    # feat_path = '/media/brownradx/ssd_data2/VLM_PE_feat/fed_feat'
-    # ckpt_dir = '/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/abn_classification_fed/fed_server_store/'
-    # ckpt_dir = os.path.join(exp_path, "checkpoint")
-    # ckeckpoint_name = f"global_round_{100}.pth"
-    
-    # save_path = os.path.join(ckpt_dir, ckeckpoint_name)
-    # checkpoint_dict = torch.load(save_path, weights_only=True)
-    # print(model.load_state_dict(checkpoint_dict))
-    # model = model.to(DEVICE, non_blocking=True)
-    
-    # feat_path = '/media/brownradx/ssd_data2/VLM_PE_feat/mix_feat'
-    # ckpt_dir = '/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/abn_classification_fed/saved/exp_mix/checkpoint/'
-    # ckeckpoint_name = f"best_auc_epoch_6.pth"
-    # save_path = os.path.join(ckpt_dir, ckeckpoint_name)
-    # checkpoint_dict = torch.load(save_path)['model']
-    # print(model.load_state_dict(checkpoint_dict))
-    # model = model.to(DEVICE, non_blocking=True)
-    
+   
     
     feat_path = './stage1_img_feat'
     ckpt_dir = './stage1_fed_server_store/'

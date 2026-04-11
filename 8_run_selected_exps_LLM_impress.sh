@@ -10,7 +10,7 @@ RESULT_FILE="study_findings_pred.jsonl"
 # ===============================
 # 手动列出多个 exp_path
 # ===============================
-/media/brownradx/ssd_code/Projects_zhusi/abn_blip
+
 EXP_PATHS=(
 "./stage2_test_result/round_50"
 )

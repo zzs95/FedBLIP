@@ -2,7 +2,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
 
 class LLM_pipline():
-    def __init__(self, model_id="/media/brownradx/ssd_2t/Zhusi_projects/LMpretrained_model/LLAMA3_8b_Instruct", max_new_tokens=512, device_map="auto"):
+    def __init__(self, model_id="LMpretrained_model/LLAMA3_8b_Instruct", max_new_tokens=512, device_map="auto"):
         self.max_new_tokens = max_new_tokens
         self.tokenizer = AutoTokenizer.from_pretrained(model_id)
         self.model = AutoModelForCausalLM.from_pretrained(

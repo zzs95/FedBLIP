@@ -14,7 +14,7 @@ import pandas as pd
 from tqdm import tqdm
 from prompts.rewrite_process_ollama import LLM_pipline
 from prompts.writing_prompts import write_impression_prompt
-
+from datasets_utils.img_cls import anno_files
 f_name = 'study_impression_pred'
 # =========================
 # Utils
@@ -54,17 +54,6 @@ def load_template_and_prompt(setname: str) -> str:
         raise ValueError(f"Unknown setname: {setname}")
     return write_prompt
 
-
-def load_abntext_df(setname: str) -> pd.DataFrame:
-    if setname == "Brown":
-        abntext_path = "/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/LLM_chest_section_gptoss_buh/brown_CTPA_report_sections_chest.xlsx"
-    elif setname == "INSPECT":
-        abntext_path = "/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/LLM_chest_section_gptoss_inspect/inspect_CTPA_report_sections_chest.xlsx"
-    elif setname == "JHU":
-        abntext_path = "/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/LLM_chest_section_gptoss_jhu/jhu_CTPA_report_sections_chest.xlsx"
-    else:
-        raise ValueError(f"Unknown setname: {setname}")
-    return pd.read_excel(abntext_path)
 
 
 def merge_parts(out_dir: str, ordered_ids: list, merged_name="study_impression_noAbnProbs"):
@@ -116,7 +105,8 @@ def worker_process(rank: int,
 
     pred_findings_df = pd.read_json(results_json, lines=True)
     result_df = pred_findings_df
-    abn_text_df = load_abntext_df(setname)
+    data_split, abntext_path, image_root = anno_files(setname)
+    abn_text_df = pd.read_excel(abntext_path)
     
     abn_text_df = abn_text_df[abn_text_df["AccessionNumber_md5"].isin(study_ids)]
     abn_text_df["AccessionNumber_md5"] = pd.Categorical(
@@ -196,7 +186,7 @@ def main():
     
     parser.add_argument("--gpus", type=str, default="0,1,2,3,4,5,6", help="ollama gpu ids, e.g. 2,3,4")
     
-    parser.add_argument("--exp_path", type=str, default="/media/brownradx/ssd_code/Projects_zhusi/abn_blip/file_fedCls_fedBLIP_CR_EMA_no_avg_7/testing/round_50")
+    parser.add_argument("--exp_path", type=str, default="./stage2_testing/round_50")
     
     parser.add_argument("--findings_results_file", type=str, default="study_findings_pred.jsonl")
     parser.add_argument("--model_id", type=str, default="gpt-oss:20b")

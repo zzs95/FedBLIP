@@ -8,9 +8,9 @@ DDP Multi-GPU Federated-style Testing (Abn-BLIP style)
 Usage:
   CUDA_VISIBLE_DEVICES=4,5 torchrun --nproc_per_node=2 test_fed_ddp.py \
     --client_name JHU --client_id 2 --global_round 30 \
-    --vis_root /media/brownradx/ssd_data2/VLM_PE_feat/fed_feat/JHU \
-    --test_ann /media/brownradx/ssd_data2/VLM_PE_feat/fed_feat/JHU/anno_file_test.json \
-    --exp_dir file_fedCls_fedBLIP_CR_EMA_no_avg/
+    --vis_root ./stage1_img_feat/JHU \
+    --test_ann ./stage1_img_feat/JHU/anno_file_test.json \
+    --exp_dir stage2_testing/
 
 Notes:
 - Each rank writes: output_results_abn_text_probs.jsonl.part{rank}
@@ -64,8 +64,8 @@ def parse_args():
     # ---------------------------
     parser.add_argument("--client_id", type=int, default=1)
     parser.add_argument("--client_name", type=str, default="INSPECT")
-    parser.add_argument("--vis_root", type=str, default="/media/brownradx/ssd_data2/VLM_PE_feat/fed_feat/INSPECT", )
-    parser.add_argument( "--test_ann", type=str, default="/media/brownradx/ssd_data2/VLM_PE_feat/fed_feat/INSPECT/anno_file_test.json", )
+    parser.add_argument("--vis_root", type=str, default="./stage1_img_feat/INSPECT", )
+    parser.add_argument( "--test_ann", type=str, default="./stage1_img_feat/INSPECT/anno_file_test.json", )
     
 
     # FL settings

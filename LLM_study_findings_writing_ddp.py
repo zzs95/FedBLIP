@@ -15,6 +15,7 @@ from tqdm import tqdm
 import numpy as np
 from prompts.rewrite_process_ollama import LLM_pipline
 from datasets_utils.abnormality_list_56 import abnormality_dict
+from datasets_utils.img_cls import anno_files
 from prompts.writing_prompts import write_findings_prompt as WRITE_FINDINGS_PROMPT
 
 f_name = 'study_findings_pred'
@@ -104,17 +105,6 @@ def load_template_and_prompt(setname: str) -> str:
     return write_prompt
 
 
-def load_abntext_df(setname: str) -> pd.DataFrame:
-    if setname == "Brown":
-        abntext_path = "/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/LLM_chest_section_gptoss_buh/brown_CTPA_report_sections_chest.xlsx"
-    elif setname == "INSPECT":
-        abntext_path = "/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/LLM_chest_section_gptoss_inspect/inspect_CTPA_report_sections_chest.xlsx"
-    elif setname == "JHU":
-        abntext_path = "/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/LLM_chest_section_gptoss_jhu/jhu_CTPA_report_sections_chest.xlsx"
-    else:
-        raise ValueError(f"Unknown setname: {setname}")
-    return pd.read_excel(abntext_path)
-
 
 def merge_parts(out_dir: str, ordered_ids: list, merged_name=f"{f_name}.jsonl"):
     merged_path = os.path.join(out_dir, merged_name)
@@ -163,7 +153,8 @@ def worker_process(rank: int,
     model_LLM = LLM_pipline(model_id=model_id, gpu=str(gpu_id))
 
     result_df = pd.read_json(results_json, lines=True)
-    abn_text_df = load_abntext_df(setname)
+    data_split, abntext_path, image_root = anno_files(setname)
+    abn_text_df = pd.read_excel(abntext_path)
     
     result_df = result_df[result_df['AccessionNumber_md5'].isin(abn_text_df['AccessionNumber_md5'])] # for mix
 

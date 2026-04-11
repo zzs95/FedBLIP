@@ -115,7 +115,10 @@ Minimal dependency lists are provided in:
 
 Current code contains dataset-specific absolute paths (Brown / INSPECT / JHU) in:
 
+- `train_stage1_base.py`
 - `datasets_utils/img_cls.py`
+- `LLM_study_findings_writing_ddp.py`
+- `LLM_study_impression_writing_ddp.py`
 
 Before running on a new environment, update these paths to your local storage.
 
