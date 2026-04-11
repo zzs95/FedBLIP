@@ -249,7 +249,7 @@ If you use this code, please cite:
   title={Fed-BLIP: Federated Styled Report Generation with Abnormality-aligned Learning for CTPA},
   author={Zhong, Zhusi and Wang, Yuli and Ahn, Sun Ho and Mullin, Christopher J. and Greineder, Colin F. and Atalay, Michael K. and Collins, Scott and Lin, Cheng Ting and Chen, Qingyu and Bai, Harrison X. and Jiao, Zhicheng},
   journal={arxiv},
-  year={2023}
+  year={2026}
 }
 ```
 
