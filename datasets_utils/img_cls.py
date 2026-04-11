@@ -8,17 +8,17 @@ from datasets_utils.abnormality_list_56 import abnormality_dict, abnormality_lis
 
 def anno_files(setname):
     if setname == 'Brown':
-        data_split = pd.read_excel('/media/brownradx/ssd_data2/Brown_PE/tables/labels_20251104_splits_filterNoLung.xlsx', index_col=False) 
-        abntext_path = '/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/LLM_abn_text_gptoss_brown_56/brown_CTPA_PE_disease_finding_56.xlsx'
-        image_root = '/media/brownradx/ssd_data2/Brown_PE/CTPA_process/CTPA_cleaned_224160'
+        data_split = pd.read_excel('Brown_splits_file.xlsx', index_col=False) 
+        abntext_path = 'brown_CTPA_PE_disease_finding_56.xlsx'
+        image_root = 'Brown_CTPA'
     elif setname == 'INSPECT':
-        data_split = pd.read_excel('/media/brownradx/ssd_data2/INSPECT_PE/tables/labels_20250611_named_splits_casewEHR_filterNoLung.xlsx', index_col=False) 
-        abntext_path = '/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/LLM_abn_text_gptoss_inspect_56/inspecta_CTPA_PE_disease_finding_56.xlsx'
-        image_root = '/media/brownradx/ssd_data2/INSPECT_PE/CTPA_process/CTPA_cleaned_224160'
+        data_split = pd.read_excel('INSPECT_splits_file.xlsx', index_col=False) 
+        abntext_path = 'inspect_CTPA_PE_disease_finding_56.xlsx'
+        image_root = 'INSPECT_CTPA'
     elif setname == 'JHU':
-        data_split = pd.read_excel('/media/brownradx/ssd_data2/JHU_PE/tables/labels_20251109_splits_filterNoLung.xlsx', index_col=False)   
-        abntext_path = '/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/LLM_abn_text_gptoss_jhu_56/jhu_CTPA_PE_disease_finding_56.xlsx'
-        image_root = '/media/brownradx/ssd_data2/JHU_PE/CTPA_process/CTPA_cleaned_224160'
+        data_split = pd.read_excel('JHU_splits_file.xlsx', index_col=False)   
+        abntext_path = 'jhu_CTPA_PE_disease_finding_56.xlsx'
+        image_root = 'JHU_CTPA'
     else:
         raise ValueError(f"Unsupported setname: {setname}. Expected one of ['Brown', 'INSPECT', 'JHU'].")
     return data_split, abntext_path, image_root
