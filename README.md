@@ -233,7 +233,7 @@ bash 8_run_selected_exps_LLM_impress.sh
 The following figure shows representative Stage-2 qualitative examples, comparing full ground-truth (`GT`) and generated (`Pred`) reports from three centers.
 
 ![Stage-2 qualitative prediction examples](figs/fig5.png)
-*Figure 3. Qualitative comparison of CTPA report generation results. The generated reports generally preserve the section structure and reporting conventions of each center, while major findings are also well captured. Nevertheless, the model still exhibits hallucinations, omissions, and structural inconsistencies across anatomical sections. <font color="red">红色文字</font> <b><span style="color:green">Green</span></b> indicates correct findings, <b><span style="color:red">red</span></b> denotes hallucinated or misplaced statements, and <b><span style="color:blue">blue</span></b> highlights omitted findings compared to the reference report.*
+*Figure 3. Qualitative comparison of CTPA report generation results. The generated reports generally preserve the section structure and reporting conventions of each center, while major findings are also well captured. Nevertheless, the model still exhibits hallucinations, omissions, and structural inconsistencies across anatomical sections. <b><span style="color:green">Green</span></b> indicates correct findings, <b><span style="color:red">red</span></b> denotes hallucinated or misplaced statements, and <b><span style="color:blue">blue</span></b> highlights omitted findings compared to the reference report.*
 
 ## Checkpoints
 
