@@ -237,7 +237,7 @@ The following figure shows representative Stage-2 qualitative examples, comparin
 
 ## Checkpoints
 
-- INSPECT training parameters / checkpoint: `TBD (link will be added after upload)`
+- INSPECT training parameters / checkpoint: `TBD (link will be added soon)`
 
 
 ## Citation
