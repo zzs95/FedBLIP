@@ -124,26 +124,9 @@ Before running on a new environment, update these paths to your local storage.
 
 ### Obtain INSPECT data
 
-INSPECT data and benchmark code are publicly released through the Stanford Shah Lab repository: [https://github.com/som-shahlab/INSPECT_public](https://github.com/som-shahlab/INSPECT_public). This repository includes the code used to construct the INSPECT cohort, plus benchmark pipelines for EHR and CT image experiments. Note that the `cohort/` and `reports/` folders document the original cohort/report generation process and require identified data, so they are mainly provided for transparency; the public benchmark workflow is under `ehr/` and `image/`.
+INSPECT data and benchmark code are publicly available through the Stanford Shah Lab repository: [som-shahlab/INSPECT_public](https://github.com/som-shahlab/INSPECT_public).
 
-To prepare INSPECT for this Fed-BLIP codebase:
-
-1. Follow the access and setup instructions in `som-shahlab/INSPECT_public` to download or prepare the public INSPECT release.
-2. Keep the INSPECT files in a local dataset root, for example:
-
-   ```text
-   /path/to/INSPECT/
-   ├── cohort_*.csv
-   ├── reports/
-   ├── image/ or ct_volumes/
-   └── output/
-   ```
-
-3. Convert or organize the downloaded CT studies into the format expected by this repository: each CTPA volume should be accessible as a `.nii.gz` file, and the INSPECT metadata table should contain the corresponding `image_id`, split, labels, and report-derived abnormality text fields.
-4. Update all INSPECT-specific absolute paths in the files listed above so that they point to your local INSPECT root and image/report annotation files.
-5. After the Stage-1 INSPECT metadata and image paths are correctly configured, run the normal pipeline: Stage-1 training/testing, feature extraction with `3_extract_image_feat.py`, and Stage-2 annotation generation with `4_make_stage2_ann_json.py`.
-
-For reference, the INSPECT repository reports that INSPECT contains CT imaging, reports, and EHR data, with 19,402 patients and 23,248 image studies.
+After obtaining access to the public INSPECT release, organize the CT volumes, reports, metadata, and labels under a local INSPECT root directory. Then update the INSPECT-specific paths in this codebase to point to the local data location before running Stage-1 training, feature extraction, and Stage-2 annotation generation.
 
 ### Stage-1 input
 
