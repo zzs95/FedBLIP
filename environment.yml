@@ -17,4 +17,4 @@ dependencies:
   - pip:
       - -r requirements.txt
       # Uncomment if you need optional utilities:
-      # - -r requirements-optional.txt
+      - -r requirements-optional.txt

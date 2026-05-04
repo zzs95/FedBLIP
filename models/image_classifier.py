@@ -1,5 +1,4 @@
 import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = '7'  
 import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -155,10 +154,9 @@ class GlobalRegionAttention(nn.Module):
 from models.i3res import I3ResNet
 
 class ImageClassifier_BASE(nn.Module):
-    def __init__(self, out_channels, region_nums=70, embed_dim=256, extract_feat=False):
+    def __init__(self, region_abn_counts, embed_dim=256, extract_feat=False):
         """
-        out_channels: list[int]，每个器官的类别数
-        region_nums: 区域数量（默认 70）
+        region_abn_counts: list[int]，每个器官的类别数
         embed_dim: 每层嵌入维度
         """
         super().__init__()
@@ -170,15 +168,25 @@ class ImageClassifier_BASE(nn.Module):
             copy.deepcopy(base), conv_class=False, return_skips=True, return_pool=True
         )
         del base
-
+        
         global_dim = 2048
-        self.num_organs = len(out_channels)
-        self.abn_classifier_heads = MLPHead(global_dim, embed_dim, num_classes=sum(out_channels))
+        self.region_abn_counts = list(region_abn_counts)
+        self.num_organs = len(self.region_abn_counts)
+
+        # single head
+        # self.abn_classifier_heads = MLPHead(global_dim, embed_dim, num_classes=sum(region_abn_counts))
+
+        # Region-specific abnormality heads.
+        # The r-th head predicts K_r abnormalities in the r-th anatomical region.
+        self.abn_classifier_heads = nn.ModuleList([
+            MLPHead(global_dim, embed_dim, num_classes=n_abn)
+            for n_abn in self.region_abn_counts
+        ])
 
         # 额外：器官存在性/选择器（可选）
         # self.organ_classifier_heads = MLPHead(global_dim, embed_dim, num_classes=self.num_organs)
 
-    def forward(self, image, _unused_region_mask, region_onehot_list):
+    def forward(self, image):
         """
         image: [B,1,D,H,W] 或 [B,1,H,W,D]（以 I3ResNet 约定为准）
         region_onehot_list: list of [B,R,H?,W?,D?]  (R=region_nums)
@@ -188,17 +196,23 @@ class ImageClassifier_BASE(nn.Module):
             return skip_feats, pooled_feat
         pooled_feat = pooled_feat.squeeze(-1).squeeze(-1).squeeze(-1)  # [B, 2048]
 
-        x_cls_heads = self.abn_classifier_heads(pooled_feat)           # [B, num_organs]
+        # abn_logits = self.abn_classifier_heads(pooled_feat)           # [B, num_organs]
+        region_logits = [
+            head(pooled_feat) for head in self.abn_classifier_heads
+        ]
+
+        abn_logits = torch.cat(region_logits, dim=1)  # [B, sum(region_abn_counts)]
+
         # organ_cls = self.organ_classifier_heads(pooled_feat)           # [B, num_organs]
         organ_cls = None
-        return x_cls_heads, organ_cls
+        return abn_logits, organ_cls
 
 
 # ========= Quick self-test =========
 if __name__ == '__main__':
     import sys
-    sys.path.append('/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/')
-    from abnormality_list import abnormality_dict
+    sys.path.append('/media/brownradx/ssd_code/Projects_zhusi/PE_VLM/fed_blip/models/image_classifier.py')
+    from datasets_utils.abnormality_list_56 import abnormality_dict
 
     region_classes = [len(v) for v in abnormality_dict.values()]
 
@@ -220,4 +234,4 @@ if __name__ == '__main__':
     model.eval()
     with torch.no_grad(), torch.amp.autocast(device_type="cuda", dtype=torch.float16, enabled=True):
         abn_logits, organ_logits = model(image_pt, organ_mask, region_onehot_list)
-    print(abn_logits.shape, organ_logits.shape)
+    print(abn_logits.shape, )

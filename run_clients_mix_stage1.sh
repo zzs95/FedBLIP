@@ -7,10 +7,10 @@
 # ===============================================================
 
 # === 全局配置 ===
-EXP_DIR="exps_mix"
+EXP_DIR="stage1_local"
 
-# === 各中心 GPU 数量配置 ===
-MIX_GPUS=6
+# ===  GPU 数量配置 ===
+MIX_GPUS=8
 
 # === 启动各中心 ===
 echo "============================================"
@@ -18,10 +18,10 @@ echo "🚀 Launching Single Client Training"
 echo "============================================"
 
 echo "[Mix] Starting ${MIX_GPUS} GPU client..."
-CUDA_VISIBLE_DEVICES=2,3,4,5,6,7 torchrun \
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun \
   --nproc_per_node=${MIX_GPUS} \
   --master_port=29500 \
-  train_stage1_base.py \
+  train_stage1_local.py \
   --setname Mix \
   --exp-path "${EXP_DIR}" 
 

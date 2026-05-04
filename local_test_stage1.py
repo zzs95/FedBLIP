@@ -74,17 +74,25 @@ def main():
     organ_abn_nums = [len(abnormality_dict[k]) for k in abnormality_dict.keys()]
     global_model = ImageClassifier(region_abn_counts=organ_abn_nums).to(DEVICE)
 
-    exp_path = './'
-    test_output = exp_path + 'stage1_test_result'
-    ckpt_dir = exp_path + 'stage1_fed_server_store/'
-    ckpt_round_num = 50
+    # exp_path = './stage1_local/Mix/'
+    # test_output = exp_path + 'test_result'
+    # ckpt_dir = exp_path + 'checkpoint/'
+    # ckpt_round_num = 38
+
+    exp_path = './stage1_local/Single/'
+    test_output = exp_path + 'test_result'
+    ckpt_dir = exp_path + 'checkpoint/'
+    ckpt_round_num_dict = {'Brown': 50, 'INSPECT': 32, 'JHU': 57}
     
-    CLIENT_NAMES = ['Brown', 'INSPECT', 'JHU'] 
-    # CLIENT_NAMES = ['INSPECT', ] 
+    # CLIENT_NAMES = ['Brown', 'INSPECT', 'JHU'] 
+    CLIENT_NAMES = ['JHU', ] 
     for client_name in CLIENT_NAMES:
-        ckeckpoint_name = f"{client_name}_round_{ckpt_round_num}.pth"
+        # ckeckpoint_name = f"{client_name}_round_{ckpt_round_num}.pth"
+        # ckeckpoint_name = f"best_auc_epoch_{ckpt_round_num}.pth"
+        ckpt_dir = exp_path +  client_name + '/checkpoint/'
+        ckeckpoint_name = f"epoch100.pth"
         save_path = os.path.join(ckpt_dir, ckeckpoint_name)
-        checkpoint_dict = torch.load(save_path, map_location=DEVICE, weights_only=True)
+        checkpoint_dict = torch.load(save_path, map_location=DEVICE)['model']
         print(global_model.load_state_dict(checkpoint_dict))
 
         model = global_model.to(DEVICE)

@@ -5,7 +5,7 @@
 # ================================================================
 
 SERVER_URL="http://127.0.0.1:8008"
-MAX_ROUND=150
+MAX_ROUND=50
 BASE_PORT=29500
 
 # 格式: CLIENT_NAME:GPU_START:GPU_COUNT:PORT_OFFSET:EPOCHS_LOCAL
@@ -15,9 +15,9 @@ CLIENTS=(
   "JHU:7:1:20:2"        # 5,700  样本 → 1 GPU, 2 epochs
 )
 
-# Brown：5 GPU，EPOCHS_LOCAL=2 → 负载 55,600×2/5 = 22,240
-# INSPECT：2 GPU，EPOCHS_LOCAL=2 → 23,000×2/2 = 23,000
-# JHU：1 GPU，EPOCHS_LOCAL=4 → 5,700×4/1 = 22,800
+# Brown：5 GPU，EPOCHS_LOCAL=1 → 55,600×1/5 = 11,120
+# INSPECT：2 GPU，EPOCHS_LOCAL=1 → 23,000×1/2 = 11,500
+# JHU：1 GPU，EPOCHS_LOCAL=2 → 5,700×2/1 = 11,400
 
 SCRIPT="train_client_autoloop_stage1.py"
 LOG_DIR="stage1_fed_logs"

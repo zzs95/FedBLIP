@@ -194,9 +194,6 @@ def inflate_downsample(downsample2d, time_stride=1):
     
 if __name__ == '__main__':
     # from torchsummary import summary
-    # model = ImageClassifier(1).cuda()
-    import sys
-    sys.path.append('/media/brownradx/ssd_code/Projects_zhusi/PE_data_process/pe_25_code/')
     from abnormality_list import abnormality_dict
     region_classes = []
     for k in abnormality_dict.keys():

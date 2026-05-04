@@ -159,218 +159,53 @@ def _load_latest_checkpoint_if_exists():
 
 _load_latest_checkpoint_if_exists()
 # ============================================================
-# 🧮 Dia-fuse Peer score
+# 🧮 cls-head fedavg
 # ============================================================
-def _peer_score_and_delta(u: dict, gamma: float, T_delta: float, clip_delta: float, eps: float) -> Tuple[float, float, float]:
-    n = float(u.get(WEIGHT_KEY0, 0.0))
-    prev = float(u.get(WEIGHT_KEY1a, u.get(WEIGHT_KEY1b, 0.0)))
-    curr = float(u.get(WEIGHT_KEY1b, prev))
-    delta = prev - curr
-    logging.info(f"delta: {delta}")
-    if clip_delta is not None:
-        delta = max(-clip_delta, min(clip_delta, delta))
-
-    q = math.exp(delta / max(T_delta, eps))
-    score = (max(n, 0.0) ** gamma) * q
-    return score, delta, n
-
-def build_personalized_mixed_params(
+def build_fedavg_params(
     updates: Dict[str, dict],
     client_names: List[str],
     base_sd: dict,
     keys: List[str],
     *,
-    # ---------- peer score ----------
-    gamma: float = 0.5,
-    T_delta: float = 0.005,
-    clip_delta: float = 0.02,
-
-    # ---------- delta stabilization (NEW) ----------
-    delta_saturate_s: Optional[float] = 0.01,   # 用 tanh 饱和 delta，避免 exp 爆炸；None 表示关闭
-
-    # ---------- teacher selection ----------
-    topk: int = 2,
-    require_improve: bool = True,               # 基本规则：优先选 delta > teacher_delta_min
-    teacher_delta_min: float = 0.0,             # teacher 的最低 delta（默认 0，即必须改善）
-    allow_strong_teacher: bool = True,          # ✅ 增强 2：强中心即使 delta≈0 也允许做 teacher
-    strong_teacher_quantile: float = 0.75,      # score 位于前 (1-q) 的中心视为 strong
-    strong_teacher_min_score: Optional[float] = None,  # 若提供则覆盖 quantile 阈值
-
-    # ---------- teacher size control (NEW) ----------
-    n_min_teacher: Optional[int] = None,        # teacher 硬门槛（建议传入：int(0.3*max_n) 或固定 1000）
-    teacher_use_size_weight: bool = True,       # teacher 权重乘 size penalty
-    teacher_size_eta: float = 1.0,              # size weight 幂次：0.5~2.0
-    teacher_min_size_w: float = 0.1,            # size weight 下限（避免变 0）
-
-    # ---------- gate / target mixing ----------
-    gate_mode: str = "sigmoid",                 # "sigmoid"（连续） or "fixed"
-    gate_good: float = 0.10,                    # gate_mode="fixed" 时：target improved
-    gate_bad: float = 0.60,                     # gate_mode="fixed" 时：target not improved
-    g_min: float = 0.05,
-    g_max: float = 0.85,
-    T_gate: float = 0.003,                      # gate 温度：越小越“硬”，建议 0.002~0.01
-    gate_center: float = 0.0,                   # gate 中心（delta=0）
-
-    # ---------- optional: size bias for target gate ----------
-    gate_use_size_bias: bool = False,
-    size_bias_N0: float = 1000.0,
-    size_bias_strength: float = 0.25,
-
     eps: float = 1e-12,
     verbose: bool = False,
-) -> Dict[str, Dict[str, torch.Tensor]]:
+) -> Dict[str, torch.Tensor]:
     """
-    为每个 target client 生成“个性化混合后的参数”（只包含 keys）。
-    mixed[k][tgt] = Tensor(cpu)
-
-    机制：
-      - teacher 候选：优先 delta>0 且样本数足够；同时允许 score 很强的中心（大中心/稳定）在 delta≈0 时继续做 teacher
-      - teacher 权重：按 score（含 exp(delta/T) 与 n^gamma）并乘 size weight，抑制“小中心 delta 很大”的误导
-      - target gate：连续函数，delta 越负吸收越多；可选再加 size bias 让小中心吸收更多
-      - delta 饱和：tanh 缓解 exp 爆炸
+    Build sample-size weighted FedAvg parameters.
+    All clients share the same aggregated global model.
     """
-    # --- 1) precompute score/delta/n for all clients ---
-    score: Dict[str, float] = {}
-    delta: Dict[str, float] = {}
-    ns: Dict[str, float] = {}
+    total_samples = sum(float(updates[c].get(WEIGHT_KEY0, 0.0)) for c in client_names)
+    total_samples = max(total_samples, eps)
 
-    for c in client_names:
-        s, d, n = _peer_score_and_delta(updates[c], gamma, T_delta, clip_delta, eps)
+    if verbose:
+        logging.info(
+            f"[FedAvg] clients={client_names}, "
+            f"samples={[int(updates[c].get(WEIGHT_KEY0, 0)) for c in client_names]}, "
+            f"total={total_samples:.1f}"
+        )
 
-        # NEW: delta saturation to avoid exp explosion & small-client overfit dominance
-        if delta_saturate_s is not None:
-            s0 = float(delta_saturate_s)
-            d = math.tanh(d / max(s0, eps)) * s0
-
-            # re-compute score with saturated delta (important!)
-            q = math.exp(d / max(T_delta, eps))
-            s = (max(n, 0.0) ** gamma) * q
-
-        score[c], delta[c], ns[c] = float(s), float(d), float(n)
-        
-    # teacher hard threshold (default: 0 if not set)
-    max_n = max([ns[c] for c in client_names] + [1.0])
-    if n_min_teacher is None:
-        n_min_teacher_eff = 0
-    else:
-        n_min_teacher_eff = int(n_min_teacher)
-
-    # --- 2) compute strong teacher threshold ---
-    scores_sorted = sorted([score[c] for c in client_names])
-    if len(scores_sorted) == 0:
-        strong_thr = float("inf")
-    else:
-        if strong_teacher_min_score is not None:
-            strong_thr = float(strong_teacher_min_score)
-        else:
-            q = max(0.0, min(1.0, float(strong_teacher_quantile)))
-            idx = int(round((len(scores_sorted) - 1) * q))
-            strong_thr = scores_sorted[idx]
-
-    def _teacher_size_w(c: str) -> float:
-        """teacher size weight: suppress small clients even if delta is large."""
-        if not teacher_use_size_weight:
-            return 1.0
-        w = (max(ns[c], 0.0) / max(max_n, 1.0)) ** float(teacher_size_eta)
-        return max(float(teacher_min_size_w), float(w))
-
-    def _is_teacher_eligible(src: str, tgt: str) -> bool:
-        if src == tgt:
-            return False
-        # NEW: teacher hard size gate
-        if ns[src] < n_min_teacher_eff:
-            return False
-        
-        # ✅ 限制大中心必须连续 3 次提升
-        if ns[src] >= n_min_teacher_eff:
-            hist = state.get("client_val_loss_hist", {}).get(src, [])
-            # if len(hist) < 3 or not (hist[0] > hist[1] > hist[2]):
-            if len(hist) < 3 or hist[-1] >= sum(hist[:-1]) / (len(hist) - 1): # 检查最近一次是否好于前两次均值
-                logging.info(f"[Reject] {src} failed 3x improvement check. hist={hist}")
-                return False
-            
-        d = delta[src]
-        s = score[src]
-            
-        if require_improve:
-            # normal eligible if improves enough
-            if d > float(teacher_delta_min):
-                return True
-            # NEW: allow strong teacher even if delta≈0 (or slightly negative if teacher_delta_min<0)
-            if allow_strong_teacher and (s >= strong_thr):
-                return True
-            return False
-        else:
-            return True
-
-    def _compute_gate_for_target(tgt: str) -> float:
-        d = float(delta[tgt])
-        n = float(ns[tgt])
-
-        if gate_mode == "fixed":
-            g = float(gate_good) if d > 0 else float(gate_bad)
-        else:
-            # sigmoid: delta 越负 -> gate 越大
-            z = (float(gate_center) - d) / max(float(T_gate), eps)
-            sgm = 1.0 / (1.0 + math.exp(-z))
-            g = float(g_min) + (float(g_max) - float(g_min)) * sgm
-
-        # optional: size bias (small client absorbs more)
-        if gate_use_size_bias:
-            bias = math.sqrt(float(size_bias_N0) / (float(size_bias_N0) + max(n, 0.0) + eps))
-            g = g + float(size_bias_strength) * bias
-
-        # clamp
-        g = max(float(g_min), min(float(g_max), float(g)))
-        return g
-
-    # --- 3) build personalized mixed params ---
-    mixed: Dict[str, Dict[str, torch.Tensor]] = {k: {} for k in keys}
+    avg_sd: Dict[str, torch.Tensor] = {}
 
     with torch.no_grad():
-        for tgt in client_names:
-            # eligible teachers
-            peers = [src for src in client_names if _is_teacher_eligible(src, tgt)]
-
-            if len(peers) == 0:
-                for k in keys:
-                    mixed[k][tgt] = updates[tgt]["weights"][k].detach().clone().cpu()
-                if verbose:
-                    logging.info(f"[PERS] {tgt}: no eligible peers -> keep local (Δ_tgt={delta[tgt]:+.4f})")
+        for k in keys:
+            if not torch.is_tensor(base_sd[k]):
+                avg_sd[k] = base_sd[k]
                 continue
 
-            # rank by (score * size_weight)  (NEW)
-            peers.sort(key=lambda c: score[c] * _teacher_size_w(c), reverse=True)
-            peers = peers[:max(1, int(topk))]
+            if not base_sd[k].dtype.is_floating_point:
+                avg_sd[k] = base_sd[k].detach().clone().cpu()
+                continue
 
-            # alpha normalization over peers (NEW includes size weight)
-            raw = [max(score[p], 0.0) * _teacher_size_w(p) for p in peers]
-            ssum = sum(raw) + eps
-            alphas = [r / ssum for r in raw]
+            avg_tensor = torch.zeros_like(base_sd[k], dtype=torch.float32)
 
-            g = _compute_gate_for_target(tgt)
+            for c in client_names:
+                n_c = float(updates[c].get(WEIGHT_KEY0, 0.0))
+                w_c = n_c / total_samples
+                avg_tensor += updates[c]["weights"][k].to(torch.float32) * w_c
 
-            if verbose:
-                peer_str = ", ".join([
-                    f"{p}(α={a:.2f},Δ={delta[p]:+.4f},n={int(ns[p])},"
-                    f"score={score[p]:.2e},sw={_teacher_size_w(p):.2f})"
-                    for p, a in zip(peers, alphas)
-                ])
-                logging.info(
-                    f"[PERS] {tgt}: g={g:.2f}, Δ_tgt={delta[tgt]:+.4f}, "
-                    f"n_tgt={int(ns[tgt])}, teacher_n_min={n_min_teacher_eff}, "
-                    f"strong_thr={strong_thr:.2e} <- {peer_str}"
-                )
+            avg_sd[k] = avg_tensor.to(dtype=base_sd[k].dtype).detach().cpu()
 
-            for k in keys:
-                local = updates[tgt]["weights"][k].to(torch.float32)
-                teacher = torch.zeros_like(local, dtype=torch.float32)
-                for src, a in zip(peers, alphas):
-                    teacher += updates[src]["weights"][k].to(torch.float32) * float(a)
-                out = (1.0 - g) * local + g * teacher
-                mixed[k][tgt] = out.to(dtype=base_sd[k].dtype).detach().cpu()
-
-    return mixed
+    return avg_sd
 
 # ============================================================
 # 🧮  聚合逻辑 cls Dia-Fuse, MRG Style Decoupled
@@ -468,34 +303,29 @@ def do_server_merge(round_idx: int):
             logging.info("ℹ️ No style_center in model.")
 
         # =========================
-        # (C) classification branch 用 personalized weighted fusion
+        # (C) classification branch 用 FedAvg
         # =========================
         cls_branch_keys = [
             k for k in base_sd.keys()
             if k.startswith("cls_embedder.") or k.startswith("classifier.")
         ]
 
-        cls_branch_personal = None
+        cls_branch_global = None
         if cls_branch_keys:
-            cls_branch_personal = build_personalized_mixed_params(
+            cls_branch_global = build_fedavg_params(
                 updates=updates,
                 client_names=client_names,
                 base_sd=base_sd,
                 keys=cls_branch_keys,
-
-                topk=2,
-                require_improve=True,
-                allow_strong_teacher=False,
-
-                n_min_teacher=n_min_teacher,
                 verbose=True,
             )
-        if cls_branch_personal:
+
+        if cls_branch_global:
             logging.info(
-                f"✅ Dia-fuse classification branch keys: {sorted(list(cls_branch_personal.keys()))}"
+                f"✅ FedAvg classification branch keys: {sorted(list(cls_branch_global.keys()))}"
             )
         else:
-            logging.info("ℹ️ No classification-branch keys aggregated by Dia-fuse.")
+            logging.info("ℹ️ No classification-branch keys aggregated by FedAvg.")
 
         # =========================
         # 写回：只写回“本轮提交的 client”
@@ -509,10 +339,10 @@ def do_server_merge(round_idx: int):
             if center_global is not None:
                 wsd["style_center"] = center_global.clone()
 
-            # personalized classification branch
-            if cls_branch_personal is not None:
+            # classification branch FedAvg
+            if cls_branch_global is not None:
                 for k in cls_branch_keys:
-                    wsd[k] = cls_branch_personal[k][cname].clone()
+                    wsd[k] = cls_branch_global[k].clone()
 
         # 更新 round 状态
         new_round = round_idx + 1

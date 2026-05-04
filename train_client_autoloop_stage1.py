@@ -28,7 +28,7 @@ mp.set_sharing_strategy("file_system")
 # ===============================
 # 📦 本地模块
 # ===============================
-from train_stage1_base import ImgABNDataset, train_transform, run_one_epoch
+from train_stage1_base import ImgABNDataset, train_transform, val_transform, run_one_epoch
 from models.image_classifier import ImageClassifier_BASE as ImageClassifier
 from datasets_utils.abnormality_list_56 import abnormality_dict
 
@@ -47,7 +47,7 @@ LR            = float(os.environ.get("LR", 3e-5))
 WEIGHT_DECAY  = float(os.environ.get("WD", 1e-5))
 ETA_MIN       = float(os.environ.get("ETA_MIN", 1e-6))
 
-EXP_DIR       = os.environ.get("EXP_DIR", f"exps_fed_stage1/{CLIENT_NAME}")
+EXP_DIR       = os.environ.get("EXP_DIR", f"stage1_fed_logs/{CLIENT_NAME}")
 os.makedirs(EXP_DIR, exist_ok=True)
 
 POLL_INTERVAL = 20  # 秒
@@ -184,6 +184,7 @@ def broadcast_state_dict_from_rank0(model: DDP):
 # ===============================
 def build_dataloader(args):
     train_list = ImgABNDataset(args.setname, mode="train")
+    # train_list = train_list[:300]
     train_ds = monai.data.Dataset(train_list, transform=train_transform)
 
     sampler = DistributedSampler(
@@ -204,6 +205,26 @@ def build_dataloader(args):
     )
     return train_ds, loader
 
+def build_val_dataloader(args):
+    val_list = ImgABNDataset(args.setname, mode="valid")
+    val_ds = monai.data.Dataset(val_list, transform=val_transform)  
+
+    sampler = DistributedSampler(
+        val_ds,
+        num_replicas=args.world_size,
+        rank=args.rank,
+        shuffle=False
+    )
+
+    loader = torch.utils.data.DataLoader(
+        val_ds,
+        batch_size=args.batch_size,
+        sampler=sampler,
+        num_workers=min(args.workers, 4),
+        pin_memory=False,
+        persistent_workers=True,
+    )
+    return val_ds, loader
 
 # ===============================
 # 🎛️ Scheduler
@@ -245,8 +266,13 @@ def local_train(
             loader.sampler.set_epoch(round_idx * epochs + ep)
 
         avg_loss, _, _, metrics = run_one_epoch(
-            model, loader, criterion,
-            optimizer, scaler, device
+            model=model,
+            loader=loader,
+            criterion=criterion,
+            optimizer=optimizer,
+            scaler=scaler,
+            device=device,
+            is_validate=False,
         )
         epoch_losses.append(avg_loss)
 
@@ -264,11 +290,38 @@ def local_train(
             writer.add_scalar("f1", metrics["f1"], round_idx * epochs + ep)
             writer.add_scalar("auc", metrics["auc"], round_idx * epochs + ep)
             writer.add_scalar("lr", lr_now, round_idx * epochs + ep)
-
         scheduler.step()
 
     return float(np.mean(epoch_losses))
 
+@torch.no_grad()
+def evaluate(model, loader, criterion, device, writer=None, round_idx=0):
+    val_loss, _, _, val_metrics = run_one_epoch(
+        model=model,
+        loader=loader,
+        criterion=criterion,
+        optimizer=None,
+        scaler=None,
+        device=device,
+        is_validate=True,
+    )
+
+    is_rank0 = (not dist.is_initialized()) or dist.get_rank() == 0
+
+    if is_rank0:
+        logging.info(
+            f"[{CLIENT_NAME}] Round {round_idx} | Validation "
+            f"| Loss={val_loss:.4f} "
+            f"| F1={val_metrics.get('f1', 0):.3f} "
+            f"| AUC={val_metrics.get('auc', 0):.3f}"
+        )
+
+        if writer is not None:
+            writer.add_scalar("val/loss", val_loss, round_idx)
+            writer.add_scalar("val/f1", val_metrics.get("f1", 0), round_idx)
+            writer.add_scalar("val/auc", val_metrics.get("auc", 0), round_idx)
+
+    return val_loss, val_metrics
 
 # ===============================
 # 🚀 主流程
@@ -286,9 +339,27 @@ def main():
     args.world_size = world_size
 
     train_ds, train_loader = build_dataloader(args)
+    val_ds, val_loader = build_val_dataloader(args)
     organ_abn_nums = [len(abnormality_dict[k]) for k in abnormality_dict.keys()]
 
-    model = ImageClassifier(out_channels=organ_abn_nums).to(device)
+    model = ImageClassifier(region_abn_counts=organ_abn_nums).to(device)
+
+    pretrained_dict = torch.load('./models/I3D_resnetInit.pth', weights_only=True)
+
+    from collections import OrderedDict
+    new_state_dict = OrderedDict()
+    
+    model_state_dict = model.state_dict()
+    for k, v in model_state_dict.items():
+        name = k   
+        if name in list(pretrained_dict.keys()):
+            new_state_dict[name] = pretrained_dict[name]
+            # print(name)
+        else:
+            new_state_dict[name] = v
+            print(name, 'mismatched')
+    print(model.load_state_dict(new_state_dict))
+
     model = DDP(
         model,
         device_ids=[local_rank],
@@ -347,8 +418,15 @@ def main():
             scaler, device, writer, local_round
         )
 
-        # ---- 这里用 train loss 近似 val loss（你后面可换成真实 val）----
-        val_loss_curr = avg_train_loss
+        val_loss_curr, val_metrics_curr = evaluate(
+            model=model,
+            loader=val_loader,
+            criterion=criterion,
+            device=device,
+            writer=writer,
+            round_idx=local_round,
+        )
+
         val_loss_prev = (
             prev_val_loss if prev_val_loss is not None else val_loss_curr
         )

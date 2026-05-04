@@ -29,9 +29,9 @@ mkdir -p "$LOG_DIR"
 # NAME:CLIENT_ID:GPU_START:GPU_COUNT:PORT_OFFSET:VIS_ROOT:TEST_JSON
 # ================================================================
 CLIENTS=(
-  # "Brown:0:0:5:0:./stage1_img_feat/Brown"
+  "Brown:0:0:5:0:./stage1_img_feat/Brown"
   "INSPECT:1:5:2:10:./stage1_img_feat/INSPECT"
-  # "JHU:2:7:1:20:./stage1_img_feat/JHU"
+  "JHU:2:7:1:20:./stage1_img_feat/JHU"
 )
 
 echo ""

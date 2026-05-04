@@ -30,7 +30,9 @@ from common.dist_utils import init_distributed_mode, get_rank, is_main_process
 from datasets_utils.imgfeat_cap import ImgFeatCapDataset
 from trainer_fed import Trainer
 from models.fedblip_style_qformer import Blip2Qformer
-
+from datasets_utils.abnormality_list_56 import abnormality_dict
+organ_num = [len(abnormality_dict[k]) for k in abnormality_dict.keys()]
+ABN_NUM = np.sum(organ_num)
 
 # ======================================================
 # 🌐 联邦相关配置
@@ -53,7 +55,6 @@ C_DIR = EXP_DIR + f"/{CLIENT_NAME}"
 os.makedirs(EXP_DIR, exist_ok=True)
 
 # ---- Model Global Config ----
-ABN_NUM      = int(os.environ.get("ABN_NUM", 56))
 NUM_CLIENTS  = int(os.environ.get("NUM_CLIENTS", 3))
 STYLE_LEARN  = bool(int(os.environ.get("STYLE_LEARN", 1)))   # 用 0/1 控制
 
@@ -243,7 +244,8 @@ def main():
     # ===== 3. 构建模型 + Trainer =====
     if is_main_process():
         print("🧠 Building model...")
-    model = Blip2Qformer(abn_num=args.abn_num, client_id=args.client_id, num_clients=args.num_clients, style_learn=bool(args.style_learn))
+
+    model = Blip2Qformer(abn_num=args.abn_num, organ_num=organ_num, client_id=args.client_id, num_clients=args.num_clients, style_learn=bool(args.style_learn))
 
     trainer = Trainer(model, train_ds, val_ds, args)
 

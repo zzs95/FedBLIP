@@ -69,16 +69,29 @@ class Blip2Qformer(Blip2Base):
         embed_dim=256,
         max_txt_len=40,
         abn_num=56,
+        organ_num=None,
         client_id=0,
         num_clients=3,
         style_learn=False,
-        **kwargs,  # 兼容 from_config 等多余参数，直接忽略
+        **kwargs,
     ):
         super().__init__()
         self.client_id = client_id
         self.num_clients = num_clients
         self.tokenizer = self.init_tokenizer()
         self.abn_size = abn_num
+
+        if organ_num is None:
+            organ_num = [abn_num]
+
+        self.organ_abn_counts = list(organ_num)
+        self.num_organs = len(self.organ_abn_counts)
+
+        assert sum(self.organ_abn_counts) == self.abn_size, (
+            f"sum(organ_num)={sum(self.organ_abn_counts)} "
+            f"must match abn_num={self.abn_size}"
+        )
+
         self.num_query_token = 1
         self.visual_encoder_num_features = 1408
 
@@ -175,11 +188,27 @@ class Blip2Qformer(Blip2Base):
         # ✅ classification branch
         self.cls_embedder = nn.Linear(self.abn_size, 1408)
         self.pool = nn.AdaptiveAvgPool3d((1, 1, 1))
-        # self.classifier = nn.Conv3d(2048, self.abn_size, kernel_size=1)
-        self.classifier = MLPHead(2048, embed_dim, num_classes=self.abn_size)
 
+        # Multi-organ abnormality classification heads.
+        self.classifier = nn.ModuleList([
+            MLPHead(2048, embed_dim, num_classes=n_abn)
+            for n_abn in self.organ_abn_counts
+        ])
         self.cls_loss_function = nn.BCEWithLogitsLoss()
-        
+
+    def _predict_abn_logits(self, feat5):
+        """
+        Predict abnormality logits using multi-organ heads.
+        """
+        pooled_feat = self.pool(feat5).flatten(1)  # [B, 2048]
+
+        organ_logits = [
+            head(pooled_feat) for head in self.classifier
+        ]
+
+        abn_logits = torch.cat(organ_logits, dim=1)  # [B, abn_size]
+        return abn_logits
+    
     # ---------------- helpers ----------------
     def _soft_xent_loss(self, sim, soft_label):
         logprobs = F.log_softmax(sim, dim=-1)
@@ -196,8 +225,7 @@ class Blip2Qformer(Blip2Base):
         abn_size = self.abn_size
 
         # ---- Classification ----
-        pooled_feat = self.pool(feat5).squeeze()
-        abn_logits = self.classifier(pooled_feat).reshape(bs, abn_size)
+        abn_logits = self._predict_abn_logits(feat5).reshape(bs, abn_size)
         abn_probs = torch.sigmoid(abn_logits)
         loss_cls = self.cls_loss_function(abn_logits, abn_label.float())
 
@@ -525,9 +553,7 @@ class Blip2Qformer(Blip2Base):
         bs = feat1.shape[0]
         abn_size = self.abn_size
 
-        pooled_feat = self.pool(feat5).squeeze()
-        abn_logits = self.classifier(pooled_feat).reshape(bs, abn_size)
-        abn_logits = abn_logits.reshape(bs, self.abn_size)
+        abn_logits = self._predict_abn_logits(feat5).reshape(bs, self.abn_size)
         abn_probs = torch.sigmoid(abn_logits)
 
         feat1_embed = self.layer1(feat1).transpose(1, 2)
