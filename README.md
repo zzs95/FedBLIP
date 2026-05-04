@@ -27,7 +27,7 @@ This repository implements a **two-stage pipeline**:
    - Generation of abnormality-level text, then optional LLM rewriting to Findings/Impression.
 
 ![Fed-BLIP Pipeline](figs/fig3.png)
-*Figure 2. Illustration of the proposed **Fed-BLIP** with three federated training stages: (1) Distribution: The server distributes the client Q-Former parameters to local clinical sites while fixing the pretrained Abn-IDed image encoder. (2) Client Training: Each institution trains its model using the proposed Style-finding Decoupling Q-Former (SD-QFormer), which contains two groups of learnable queries: (i) 56 abnormality learning queries fused via cross-attention to perform abnormality-aligned contrastive learning and guide abnormal-focused text generation; and (ii) client-specific style learning queries, which capture institution-dependent stylistic patterns through self-attention and are optimized using client-wise text style contrastive learning to separate reporting style from clinical content. (3) Aggregation: The server aggregates updated model parameters via Dia-fuse adaptive average while broadcasting client-specific style prototype, forming the next-round client models for redistribution.*
+*Figure 2. Illustration of the proposed **Fed-BLIP** with three federated training stages: (1) Distribution: The server distributes the client Q-Former parameters to local clinical sites while keeping the pretrained abnormality-aware image encoder fixed. (2) Client Training: Each institution trains its model using the proposed Style-finding Decoupling Q-Former (SD-QFormer), which contains two groups of learnable queries: (i) 56 abnormality learning queries fused via cross-attention to perform abnormality-aligned contrastive learning and guide abnormal-focused text generation; and (ii) client-specific style learning queries, which capture institution-dependent stylistic patterns through self-attention and are optimized using client-wise text style contrastive learning to separate reporting style from clinical content. (3) Aggregation: The server employs task-specific aggregation, using FedAvg for classification to obtain shared abnormality representations and style-decoupled aggregation for MRG to transfer semantic knowledge while preserving client-specific reporting styles.*
 
 ## Repository Structure
 
@@ -121,6 +121,29 @@ Current code contains dataset-specific absolute paths (Brown / INSPECT / JHU) in
 - `LLM_study_impression_writing_ddp.py`
 
 Before running on a new environment, update these paths to your local storage.
+
+### Obtain INSPECT data
+
+INSPECT data and benchmark code are publicly released through the Stanford Shah Lab repository: [https://github.com/som-shahlab/INSPECT_public](https://github.com/som-shahlab/INSPECT_public). This repository includes the code used to construct the INSPECT cohort, plus benchmark pipelines for EHR and CT image experiments. Note that the `cohort/` and `reports/` folders document the original cohort/report generation process and require identified data, so they are mainly provided for transparency; the public benchmark workflow is under `ehr/` and `image/`.
+
+To prepare INSPECT for this Fed-BLIP codebase:
+
+1. Follow the access and setup instructions in `som-shahlab/INSPECT_public` to download or prepare the public INSPECT release.
+2. Keep the INSPECT files in a local dataset root, for example:
+
+   ```text
+   /path/to/INSPECT/
+   ├── cohort_*.csv
+   ├── reports/
+   ├── image/ or ct_volumes/
+   └── output/
+   ```
+
+3. Convert or organize the downloaded CT studies into the format expected by this repository: each CTPA volume should be accessible as a `.nii.gz` file, and the INSPECT metadata table should contain the corresponding `image_id`, split, labels, and report-derived abnormality text fields.
+4. Update all INSPECT-specific absolute paths in the files listed above so that they point to your local INSPECT root and image/report annotation files.
+5. After the Stage-1 INSPECT metadata and image paths are correctly configured, run the normal pipeline: Stage-1 training/testing, feature extraction with `3_extract_image_feat.py`, and Stage-2 annotation generation with `4_make_stage2_ann_json.py`.
+
+For reference, the INSPECT repository reports that INSPECT contains CT imaging, reports, and EHR data, with 19,402 patients and 23,248 image studies.
 
 ### Stage-1 input
 
