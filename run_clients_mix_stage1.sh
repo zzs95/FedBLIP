@@ -21,7 +21,7 @@ echo "[Mix] Starting ${MIX_GPUS} GPU client..."
 CUDA_VISIBLE_DEVICES=0,1,2,3,4,5,6,7 torchrun \
   --nproc_per_node=${MIX_GPUS} \
   --master_port=29500 \
-  train_stage1_local.py \
+  local_train_stage1.py \
   --setname Mix \
   --exp-path "${EXP_DIR}" 
 
