@@ -6,7 +6,7 @@
 
 EXP_DIR="stage1_local/Single"
 BASE_PORT=29500
-SCRIPT="train_stage1_local.py"
+SCRIPT="local_train_stage1.py"
 LOG_DIR="${EXP_DIR}/local_logs"
 mkdir -p "${LOG_DIR}"
 
