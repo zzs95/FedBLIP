@@ -210,8 +210,6 @@ class ImageClassifier_BASE(nn.Module):
 
 # ========= Quick self-test =========
 if __name__ == '__main__':
-    import sys
-    sys.path.append('/media/brownradx/ssd_code/Projects_zhusi/PE_VLM/fed_blip/models/image_classifier.py')
     from datasets_utils.abnormality_list_56 import abnormality_dict
 
     region_classes = [len(v) for v in abnormality_dict.values()]
